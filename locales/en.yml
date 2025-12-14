@@ -1,0 +1,11 @@
+en:
+  js:
+    hbp_birthdate:
+      group_label: "Birthdate"
+      day: "Day"
+      month: "Month"
+      year: "Year"
+      select: "Select…"
+
+      age: "Age"
+      birthday_today_title: "Happy birthday!"
