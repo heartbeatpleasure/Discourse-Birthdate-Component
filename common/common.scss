@@ -72,6 +72,8 @@
 
 /* Manual positioning class */
 .hbp-birthdate-dropdown--manual {
+  /* Important: force our fixed overlay positioning to win over select-kit */
+  position: fixed !important;
   transform: none !important;
   right: auto !important;
   inset: auto !important;
