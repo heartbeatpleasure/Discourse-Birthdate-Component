@@ -18,11 +18,16 @@ const MONTHS_EN = [
   "December",
 ];
 
-// Keep anchor state per <details>
-const ANCHORS = new WeakMap();
-
 function text(el) {
   return (el?.textContent || "").trim();
+}
+
+function isMissingTranslation(v) {
+  return (
+    !v ||
+    String(v).startsWith("[") ||
+    (String(v).includes(".js.") && String(v).endsWith("]"))
+  );
 }
 
 /**
@@ -174,288 +179,64 @@ function normalizeBodyEl(el) {
 }
 
 function findOpenBody(details) {
-  // 1) Most reliable: inside this details
-  const inside =
-    details.querySelector(".select-kit-body.is-expanded") ||
-    details.querySelector(".select-kit-body");
-  if (inside && isVisible(inside)) return normalizeBodyEl(inside);
+  const inside = details.querySelector(".select-kit-body");
+  if (inside) return normalizeBodyEl(inside);
 
-  // 2) aria-controls linkage (if present)
-  const trigger = getTriggerEl(details);
-  const ctrlId =
-    trigger?.getAttribute?.("aria-controls") ||
-    details.querySelector("[aria-controls]")?.getAttribute?.("aria-controls");
+  const ctrl =
+    details.querySelector("[aria-controls]") ||
+    details.querySelector("summary[aria-controls]") ||
+    details.querySelector(".select-kit-header-wrapper[aria-controls]");
+  const ctrlId = ctrl?.getAttribute?.("aria-controls");
   if (ctrlId) {
     const target = document.getElementById(ctrlId);
-    if (target) {
-      const norm = normalizeBodyEl(target);
-      if (norm && isVisible(norm)) return norm;
-    }
+    if (target) return normalizeBodyEl(target);
   }
 
-  // 3) Fallback: choose the closest *expanded* body in the document
+  const trigger = getTriggerEl(details);
   const tr = trigger.getBoundingClientRect();
-  const candidates = Array.from(
-    document.querySelectorAll(
-      ".select-kit-body.is-expanded, .select-kit-body[aria-hidden='false'], .select-kit-collection.is-expanded"
-    )
-  )
-    .map(normalizeBodyEl)
-    .filter((el) => el && isVisible(el));
 
   let best = null;
   let bestScore = Infinity;
 
-  candidates.forEach((b) => {
-    const br = b.getBoundingClientRect();
-    const score =
-      Math.abs(br.top - tr.bottom) + Math.abs(br.left - tr.left) * 0.7;
-    if (score < bestScore) {
-      bestScore = score;
-      best = b;
-    }
-  });
+  document
+    .querySelectorAll(".select-kit-body, .select-kit-collection")
+    .forEach((b) => {
+      const bb = normalizeBodyEl(b);
+      if (!bb || !isVisible(bb)) return;
+      const br = bb.getBoundingClientRect();
 
-  if (best) return best;
+      const score =
+        Math.abs(br.top - tr.bottom) + Math.abs(br.left - tr.left) * 0.7;
 
-  // 4) Last resort: any visible select-kit body
-  const any = Array.from(
-    document.querySelectorAll(".select-kit-body, .select-kit-collection")
-  )
-    .map(normalizeBodyEl)
-    .find((el) => el && isVisible(el));
+      if (score < bestScore) {
+        bestScore = score;
+        best = bb;
+      }
+    });
 
-  return any || null;
+  return best;
 }
 
-function isVisiblyMisaligned(body, triggerRect, expectedWidth) {
-  const br = body.getBoundingClientRect();
-  const leftDiff = Math.abs(br.left - triggerRect.left);
-  const widthDiff = Math.abs(br.width - expectedWidth);
+// Important: Discourse's select-kit already positions dropdowns correctly (also inside modals).
+// The previous version tried to manually reposition the dropdown, which can break when you
+// scroll inside the signup modal (the scroll container is not the window). That is exactly
+// the "opens too low after scroll" bug you reported.
+//
+// We now only add a styling hook class, and leave positioning to select-kit.
+function styleDropdownBody(details) {
+  const body = findOpenBody(details);
+  if (!body) return;
+  body.classList.add("hbp-birthdate-dropdown");
 
-  // Vertical: accept either "below" or "flipped above".
-  const expectedBelowTop = triggerRect.bottom;
-  const expectedAboveTop = triggerRect.top - br.height;
-  const topDiff = Math.min(
-    Math.abs(br.top - expectedBelowTop),
-    Math.abs(br.top - expectedAboveTop)
-  );
-
-  return leftDiff > 12 || widthDiff > 16 || topDiff > 14;
-}
-
-function clearManualStyles(body) {
-  body.classList.remove("hbp-birthdate-dropdown--manual");
-  body.style.position = "";
-  body.style.left = "";
-  body.style.top = "";
-  body.style.right = "";
-  body.style.bottom = "";
-  body.style.inset = "";
-  body.style.transform = "";
-  body.style.marginLeft = "";
-  body.style.maxHeight = "";
-  body.style.overflowY = "";
-  body.style.width = "";
-  body.style.minWidth = "";
-  body.style.maxWidth = "";
-  body.style.boxSizing = "";
-}
-
-function applyWidthToTrigger(body, details) {
+  // Keep the dropdown width aligned with the trigger, without touching positioning.
+  // (Positioning is handled by select-kit and works correctly in scrollable modals.)
   const trigger = getTriggerEl(details);
   const rect = trigger.getBoundingClientRect();
   const width = Math.max(160, Math.round(rect.width));
-
-  body.classList.add("hbp-birthdate-dropdown");
   body.style.boxSizing = "border-box";
   body.style.width = `${width}px`;
   body.style.minWidth = `${width}px`;
   body.style.maxWidth = `${width}px`;
-
-  return { triggerRect: rect, width };
-}
-
-// If an element has a transformed ancestor, position:fixed becomes relative to that ancestor.
-function findFixedContainingBlock(el) {
-  let p = el?.parentElement;
-  while (p && p !== document.documentElement) {
-    const cs = window.getComputedStyle(p);
-    const hasTransform = cs.transform && cs.transform !== "none";
-    const hasPerspective = cs.perspective && cs.perspective !== "none";
-    const hasFilter = cs.filter && cs.filter !== "none";
-    const willChange = (cs.willChange || "").toLowerCase();
-
-    if (
-      hasTransform ||
-      hasPerspective ||
-      hasFilter ||
-      willChange.includes("transform") ||
-      willChange.includes("perspective")
-    ) {
-      return p;
-    }
-
-    p = p.parentElement;
-  }
-  return null;
-}
-
-function positionDropdownUnderTrigger(details, { force = false } = {}) {
-  const body = findOpenBody(details);
-  if (!body) return;
-
-  const { triggerRect, width } = applyWidthToTrigger(body, details);
-
-  // The bug (after scrolling, menu opens too low) is a vertical misalignment.
-  // Force manual positioning when:
-  // - caller requests it (force)
-  // - or we can see it's misaligned
-  const manual = force || isVisiblyMisaligned(body, triggerRect, width);
-
-  if (!manual) {
-    clearManualStyles(body);
-    return;
-  }
-
-  body.classList.add("hbp-birthdate-dropdown--manual");
-
-  // Force a consistent coordinate system (viewport). This avoids container scroll offsets
-  // that can be incorrectly added by select-kit on first open.
-  body.style.position = "fixed";
-  body.style.transform = "none";
-  body.style.inset = "auto";
-  body.style.right = "auto";
-  body.style.bottom = "auto";
-  body.style.marginLeft = "0";
-
-  const padding = 8;
-
-  // Decide flip (up/down)
-  const currentRect = body.getBoundingClientRect();
-  const bodyHeight = Math.max(40, Math.round(currentRect.height || 0));
-  const spaceBelow = window.innerHeight - triggerRect.bottom - padding;
-  const spaceAbove = triggerRect.top - padding;
-  const openUp = bodyHeight > spaceBelow && spaceAbove > spaceBelow;
-
-  let left = Math.round(triggerRect.left);
-  let top = openUp
-    ? Math.round(triggerRect.top - bodyHeight)
-    : Math.round(triggerRect.bottom);
-
-  // Clamp inside viewport
-  const maxLeft = Math.max(padding, window.innerWidth - width - padding);
-  left = Math.min(Math.max(left, padding), maxLeft);
-  top = Math.max(padding, top);
-
-  // Limit height so it never runs off-screen
-  const maxHeight = openUp
-    ? Math.max(120, Math.round(triggerRect.top - padding))
-    : Math.max(120, Math.round(window.innerHeight - top - padding));
-  body.style.maxHeight = `${maxHeight}px`;
-  body.style.overflowY = "auto";
-
-  // Handle transformed ancestors (fixed containing block)
-  const cb = findFixedContainingBlock(body);
-  if (cb) {
-    const cbr = cb.getBoundingClientRect();
-    left -= Math.round(cbr.left);
-    top -= Math.round(cbr.top);
-  }
-
-  body.style.left = `${left}px`;
-  body.style.top = `${top}px`;
-}
-
-function stopAnchor(details) {
-  const state = ANCHORS.get(details);
-  if (!state) return;
-
-  state.stopped = true;
-
-  if (state.raf) cancelAnimationFrame(state.raf);
-  if (state.moveRaf) cancelAnimationFrame(state.moveRaf);
-  if (state.observer) state.observer.disconnect();
-
-  if (state.onMove) {
-    window.removeEventListener("scroll", state.onMove, true);
-    window.removeEventListener("resize", state.onMove);
-  }
-
-  // Clean any manual styles that might stick around
-  const body = findOpenBody(details);
-  if (body) clearManualStyles(body);
-
-  ANCHORS.delete(details);
-}
-
-function startAnchor(details, syncOpenList) {
-  stopAnchor(details);
-
-  const state = {
-    stopped: false,
-    raf: null,
-    moveRaf: null,
-    frames: 0,
-    maxFrames: 75, // ~1.25s of "last write wins" positioning
-    observer: null,
-    observedBody: null,
-    onMove: null,
-  };
-
-  const schedule = () => {
-    if (state.stopped || !details.open) return;
-    if (state.moveRaf) return;
-    state.moveRaf = requestAnimationFrame(() => {
-      state.moveRaf = null;
-      syncOpenList(true);
-    });
-  };
-
-  state.onMove = () => schedule();
-
-  window.addEventListener("scroll", state.onMove, true);
-  window.addEventListener("resize", state.onMove);
-
-  const ensureObserver = () => {
-    const body = findOpenBody(details);
-    if (!body || state.observedBody === body) return;
-
-    if (state.observer) state.observer.disconnect();
-
-    const obs = new MutationObserver(() => {
-      // select-kit may rewrite inline styles after open; we re-apply ours.
-      schedule();
-    });
-
-    obs.observe(body, {
-      attributes: true,
-      attributeFilter: ["style", "class"],
-    });
-
-    state.observer = obs;
-    state.observedBody = body;
-  };
-
-  const tick = () => {
-    if (state.stopped || !details.open) return;
-
-    ensureObserver();
-    syncOpenList(true);
-
-    state.frames++;
-    if (state.frames < state.maxFrames) {
-      state.raf = requestAnimationFrame(tick);
-    } else {
-      state.raf = null;
-      // After the initial "fight" with late style updates, keep event-driven updates only.
-    }
-  };
-
-  ANCHORS.set(details, state);
-
-  // Kick off immediately
-  state.raf = requestAnimationFrame(tick);
 }
 
 function decorateBirthdateSelect(fieldEl, { isMonth = false } = {}) {
@@ -481,7 +262,7 @@ function decorateBirthdateSelect(fieldEl, { isMonth = false } = {}) {
     }
   };
 
-  const syncOpenList = (force = false) => {
+  const syncOpenList = () => {
     if (!details.open) return;
 
     const body = findOpenBody(details);
@@ -499,7 +280,8 @@ function decorateBirthdateSelect(fieldEl, { isMonth = false } = {}) {
         });
     }
 
-    positionDropdownUnderTrigger(details, { force });
+    // Styling hook only; positioning is handled by Discourse's select-kit.
+    styleDropdownBody(details);
   };
 
   syncHeaderFromValue();
@@ -510,24 +292,23 @@ function decorateBirthdateSelect(fieldEl, { isMonth = false } = {}) {
     details.addEventListener("toggle", () => {
       syncHeaderFromValue();
 
-      if (details.open) {
-        // Start anchoring; this corrects the "open after scroll" bug reliably.
-        startAnchor(details, syncOpenList);
+      setTimeout(() => syncOpenList(), 0);
+      setTimeout(() => syncOpenList(), 40);
+      setTimeout(() => syncOpenList(), 120);
 
-        // Also run a few delayed syncs for safety.
-        setTimeout(() => syncOpenList(true), 0);
-        setTimeout(() => syncOpenList(true), 60);
-        setTimeout(() => syncOpenList(true), 180);
-        setTimeout(() => syncOpenList(true), 350);
-      } else {
-        stopAnchor(details);
+      if (details.open) {
+        // Add the styling hook as soon as the dropdown is in the DOM.
+        setTimeout(() => styleDropdownBody(details), 0);
       }
     });
 
     details.addEventListener("click", () => {
-      // Keep header synced and (if open) re-anchor
       syncHeaderFromValue();
-      if (details.open) syncOpenList(true);
+      setTimeout(() => {
+        syncHeaderFromValue();
+        syncOpenList();
+      }, 0);
+      setTimeout(() => syncHeaderFromValue(), 60);
     });
   }
 }
@@ -647,6 +428,7 @@ function enhanceRoot(root) {
   const month = root.querySelector(".user-field-hbp_birth_month");
   const year = root.querySelector(".user-field-hbp_birth_year");
 
+  // ✅ Labels now match Theme translations (Day / Month / Year)
   if (day && !day.dataset.hbpEnhanced) {
     setNiceLabel(day, "hbp_birthdate.day", "Day");
     day.dataset.hbpEnhanced = "1";
