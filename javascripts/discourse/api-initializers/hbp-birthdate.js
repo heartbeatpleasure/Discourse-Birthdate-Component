@@ -22,10 +22,6 @@ function text(el) {
   return (el?.textContent || "").trim();
 }
 
-function isMissingTranslation(v) {
-  return !v || String(v).startsWith("[") || String(v).includes(".js.") && String(v).endsWith("]");
-}
-
 /**
  * Try multiple translation namespaces:
  * - themePrefix("hbp_birthdate.day")  (theme component translations)
@@ -240,7 +236,22 @@ function isVisiblyMisaligned(body, triggerRect, expectedWidth) {
   const br = body.getBoundingClientRect();
   const leftDiff = Math.abs(br.left - triggerRect.left);
   const widthDiff = Math.abs(br.width - expectedWidth);
-  return leftDiff > 12 || widthDiff > 16;
+
+  // Vertical alignment: Select-kit may end up computing a document-based top while
+  // the dropdown is positioned in viewport coordinates (or vice versa). This only
+  // shows up after the page has been scrolled.
+  //
+  // We consider it "aligned" if it is close to either:
+  // - directly below the trigger, or
+  // - directly above the trigger (flipped)
+  const expectedBelowTop = triggerRect.bottom;
+  const expectedAboveTop = triggerRect.top - br.height;
+  const topDiff = Math.min(
+    Math.abs(br.top - expectedBelowTop),
+    Math.abs(br.top - expectedAboveTop)
+  );
+
+  return leftDiff > 12 || widthDiff > 16 || topDiff > 14;
 }
 
 function clearManualStyles(body) {
@@ -252,6 +263,8 @@ function clearManualStyles(body) {
   body.style.inset = "";
   body.style.transform = "";
   body.style.marginLeft = "";
+  body.style.maxHeight = "";
+  body.style.overflowY = "";
 }
 
 function applyWidthToTrigger(body, details) {
@@ -292,11 +305,29 @@ function positionDropdownUnderTrigger(details) {
 
   const padding = 8;
 
+  // Decide whether to open below or above (if there isn't enough space below)
+  // We measure AFTER width has been applied so that the height is close to final.
+  const bodyRect = body.getBoundingClientRect();
+  const bodyHeight = Math.round(bodyRect.height);
+  const spaceBelow = window.innerHeight - triggerRect.bottom - padding;
+  const spaceAbove = triggerRect.top - padding;
+  const openUp = bodyHeight > spaceBelow && spaceAbove > spaceBelow;
+
   let left = Math.round(triggerRect.left);
-  let top = Math.round(triggerRect.bottom);
+  let top = openUp
+    ? Math.round(triggerRect.top - bodyHeight)
+    : Math.round(triggerRect.bottom);
 
   const maxLeft = Math.max(padding, window.innerWidth - width - padding);
   left = Math.min(Math.max(left, padding), maxLeft);
+  top = Math.max(padding, top);
+
+  // Keep the dropdown from running off-screen.
+  const maxHeight = openUp
+    ? Math.max(120, Math.round(triggerRect.top - padding))
+    : Math.max(120, Math.round(window.innerHeight - top - padding));
+  body.style.maxHeight = `${maxHeight}px`;
+  body.style.overflowY = "auto";
 
   const cs = window.getComputedStyle(body);
   const pos = cs.position;
@@ -370,12 +401,44 @@ function decorateBirthdateSelect(fieldEl, { isMonth = false } = {}) {
   if (!details.dataset.hbpBirthdateHooked) {
     details.dataset.hbpBirthdateHooked = "1";
 
+    // When a select-kit opens, the dropdown body can be rendered/positioned in
+    // a few async passes (search box, rows, height measurements). After scroll,
+    // some browsers end up with an incorrect initial top.
+    //
+    // So we: (1) re-run our sync several animation frames, and (2) re-position
+    // on scroll/resize using rAF throttling.
+    const runOpenSync = () => {
+      if (!details.open) return;
+
+      let frames = 0;
+      const tick = () => {
+        if (!details.open) return;
+        syncOpenList();
+        frames++;
+        if (frames < 20) requestAnimationFrame(tick);
+      };
+
+      requestAnimationFrame(tick);
+
+      // Extra safety for slower devices/themes that animate the dropdown.
+      setTimeout(() => details.open && syncOpenList(), 250);
+      setTimeout(() => details.open && syncOpenList(), 600);
+    };
+
+    let moveRaf = null;
+    const onMove = () => {
+      if (!details.open) return;
+      if (moveRaf) return;
+      moveRaf = requestAnimationFrame(() => {
+        moveRaf = null;
+        positionDropdownUnderTrigger(details);
+      });
+    };
+
     details.addEventListener("toggle", () => {
       syncHeaderFromValue();
 
-      setTimeout(() => syncOpenList(), 0);
-      setTimeout(() => syncOpenList(), 40);
-      setTimeout(() => syncOpenList(), 120);
+      if (details.open) runOpenSync();
 
       if (!details.open) {
         const b = findOpenBody(details);
@@ -384,17 +447,11 @@ function decorateBirthdateSelect(fieldEl, { isMonth = false } = {}) {
     });
 
     details.addEventListener("click", () => {
+      // In some themes the native toggle can be delayed; keep the header in sync
+      // and re-run positioning if the dropdown is already open.
       syncHeaderFromValue();
-      setTimeout(() => {
-        syncHeaderFromValue();
-        syncOpenList();
-      }, 0);
-      setTimeout(() => syncHeaderFromValue(), 60);
+      if (details.open) runOpenSync();
     });
-
-    const onMove = () => {
-      if (details.open) positionDropdownUnderTrigger(details);
-    };
     window.addEventListener("scroll", onMove, true);
     window.addEventListener("resize", onMove);
   }
