@@ -1,0 +1,240 @@
+/* ===== Birthdate group styling ===== */
+
+.hbp-birthdate-group {
+  margin: 0 0 1.25em;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  overflow: visible;
+}
+
+.hbp-birthdate-group__heading {
+  margin: 0 0 1rem 0 !important;
+  color: var(--primary-medium, #909090);
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.hbp-birthdate-group__subheading {
+  margin: 0 0 0.75em 0;
+  color: var(--primary-medium);
+  font-size: var(--font-down-1);
+}
+
+.hbp-birthdate-group__row {
+  display: flex;
+  gap: 0.75em;
+  align-items: flex-start;
+  flex-wrap: nowrap;
+  overflow: visible;
+}
+
+.hbp-birthdate-group__row > * {
+  flex: 1 1 0;
+  min-width: 0;
+  margin: 0;
+}
+
+/* Cruciaal (signup): headers mogen krimpen */
+.hbp-birthdate-group details.select-kit,
+.hbp-birthdate-group .select-kit,
+.hbp-birthdate-group .select-kit-header,
+.hbp-birthdate-group .select-kit-header-wrapper,
+.hbp-birthdate-group .select-kit-selected-name {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0 !important;
+}
+
+.hbp-birthdate-group .select-kit-selected-name .name {
+  display: block;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Base dropdown look */
+.hbp-birthdate-dropdown {
+  z-index: 3000;
+  background: var(--secondary);
+  border: 1px solid var(--primary-low);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.hbp-birthdate-dropdown .select-kit-body,
+.hbp-birthdate-dropdown .select-kit-collection,
+.hbp-birthdate-dropdown .select-kit-filter {
+  background: var(--secondary);
+}
+
+.hbp-birthdate-group .instructions {
+  display: none;
+}
+
+/* ===== User card birthday icon + confetti ===== */
+
+/* Positioning context in user card header */
+.user-card .names,
+.user-card .user-card-names,
+.user-card .card-content .names {
+  position: relative;
+}
+
+/* 🎂 icon */
+.user-card .hbp-birthday-icon {
+  position: absolute;
+  right: 0.35rem;
+  top: 0.25rem;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  font-size: clamp(1.45rem, 3.2vw, 2rem);
+  line-height: 1;
+
+  pointer-events: none;
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.45));
+}
+
+/* Confetti layer */
+.user-card .hbp-confetti-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 50;
+}
+
+/* Particles */
+.user-card .hbp-confetti {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  opacity: 1;
+  animation: hbp-confetti-drift var(--dur) linear var(--delay) forwards;
+}
+
+/* Palette */
+.user-card .hbp-confetti--1 {
+  background: var(--tertiary, #00aaff);
+}
+.user-card .hbp-confetti--2 {
+  background: var(--success, #2ecc71);
+}
+.user-card .hbp-confetti--3 {
+  background: var(--danger, #e74c3c);
+}
+.user-card .hbp-confetti--4 {
+  background: var(--love, #ff4d6d);
+}
+.user-card .hbp-confetti--5 {
+  background: var(--highlight, #f1c40f);
+}
+
+@keyframes hbp-confetti-drift {
+  0% {
+    transform: translate(-50%, -50%) translate(0, 0) rotate(0deg);
+    opacity: 1;
+  }
+  35% {
+    transform: translate(-50%, -50%) translate(var(--dx1), var(--dy1))
+      rotate(var(--rot1));
+    opacity: 1;
+  }
+  70% {
+    transform: translate(-50%, -50%) translate(var(--dx2), var(--dy2))
+      rotate(var(--rot2));
+    opacity: 0.95;
+  }
+  100% {
+    transform: translate(-50%, -50%) translate(var(--dx3), var(--dy3))
+      rotate(var(--rot3));
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .user-card .hbp-confetti {
+    animation: none !important;
+    opacity: 0 !important;
+  }
+}
+
+/* ===== Online-like birthdays row ===== */
+
+.hbp-birthdays-online {
+  /* Match Online behavior: same typography */
+  font: inherit;
+  color: var(--primary-medium);
+
+  /* Layout like Online */
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+
+  /* Prevent any inherited flex spacing rules from pushing avatars to the right */
+  justify-content: flex-start !important;
+}
+
+.hbp-birthdays-online--home {
+  /* Same “block separation” feel as Online, plus spacing to Category below */
+  border-top: 1px solid var(--primary-low);
+  margin-top: 0.45rem;
+  padding-top: 0.45rem;
+
+  /* This fixes the few-px left shift vs Online */
+  padding-left: 4px;
+
+  /* More space before Category */
+  margin-bottom: 0.65rem;
+}
+
+.hbp-birthdays-online__label,
+.hbp-birthdays-online__count,
+.hbp-birthdays-online__empty,
+.hbp-birthdays-online__more {
+  font: inherit;
+  color: inherit;
+}
+
+.hbp-birthdays-online__list {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.hbp-birthdays-online__user {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  text-decoration: none;
+  vertical-align: middle;
+}
+
+.hbp-birthdays-online__avatar {
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  display: block;
+  vertical-align: middle;
+}
+
+.hbp-birthdays-online__more {
+  padding: 0 0.2rem;
+}
+
+/* Sidebar variant (if used later) */
+.hbp-birthdays-online--sidebar {
+  padding: 0.5rem 0.75rem;
+  border-top: 1px solid var(--primary-low);
+}
+
+.hbp-birthdays-online--sidebar .hbp-birthdays-online__avatar {
+  width: 20px;
+  height: 20px;
+}

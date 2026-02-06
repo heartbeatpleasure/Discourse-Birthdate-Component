@@ -1,0 +1,204 @@
+confetti_enabled:
+  default: true
+  type: bool
+  description: "Enable birthday confetti on user cards"
+
+# Exact name (label) of the Discourse **User Field** (type: Confirmation)
+# that a user can enable to hide their age.
+#
+# Recommended user field label:
+#   "Hide my age on my profile"
+hide_age_user_field_name:
+  default: "Hide my age on my profile"
+  type: string
+  description: "If this user field is checked, the user's age will be hidden on user cards and profile pages."
+
+birthdays_widget_enabled:
+  default: true
+  type: bool
+  description: "Show a small 'Today's birthdays' widget (home and/or sidebar)."
+
+# Where to show the birthdays row
+birthdays_widget_show_top:
+  default: true
+  type: bool
+  description: "Show today's birthdays as a compact row above the topic list (home/categories pages)."
+
+birthdays_widget_show_sidebar:
+  default: false
+  type: bool
+  description: "Show today's birthdays in the left sidebar (when sidebar outlets are available)."
+
+birthdays_widget_hide_if_empty:
+  default: false
+  type: bool
+  description: "Hide the birthdays row entirely when there are no birthdays today."
+
+birthdays_widget_label:
+  default: "Today's birthdays"
+  type: string
+  description: "Label shown next to the birthday avatars (home/sidebar)."
+
+birthdays_widget_endpoint:
+  default: "/hbp/birthdays/today.json"
+  type: string
+  description: "JSON endpoint used to fetch today's birthdays (served by the Birthdate plugin)."
+
+birthdays_widget_max_users:
+  default: 8
+  type: integer
+  min: 1
+  max: 50
+  description: "Maximum number of users to show in the birthdays widget."
+
+confetti_particle_count:
+  default: 14
+  type: integer
+  min: 0
+  max: 80
+  description: "Number of confetti particles per burst"
+
+confetti_duration_min:
+  default: 3500
+  type: integer
+  min: 300
+  max: 20000
+  description: "Min duration (ms) for the drift animation (higher = slower)"
+
+confetti_duration_max:
+  default: 6500
+  type: integer
+  min: 300
+  max: 30000
+  description: "Max duration (ms) for the drift animation (higher = slower)"
+
+confetti_delay_max:
+  default: 260
+  type: integer
+  min: 0
+  max: 5000
+  description: "Max start delay (ms) per particle"
+
+confetti_drift_x1_min:
+  default: -40
+  type: integer
+  min: -500
+  max: 0
+  description: "Drift phase 1 X min (px)"
+
+confetti_drift_x1_max:
+  default: 40
+  type: integer
+  min: 0
+  max: 500
+  description: "Drift phase 1 X max (px)"
+
+confetti_drift_x2_min:
+  default: -70
+  type: integer
+  min: -700
+  max: 0
+  description: "Drift phase 2 X min (px)"
+
+confetti_drift_x2_max:
+  default: 70
+  type: integer
+  min: 0
+  max: 700
+  description: "Drift phase 2 X max (px)"
+
+confetti_drift_x3_min:
+  default: -90
+  type: integer
+  min: -900
+  max: 0
+  description: "Drift phase 3 X min (px)"
+
+confetti_drift_x3_max:
+  default: 90
+  type: integer
+  min: 0
+  max: 900
+  description: "Drift phase 3 X max (px)"
+
+confetti_rot_min:
+  default: -160
+  type: integer
+  min: -720
+  max: 0
+  description: "Min rotation (deg)"
+
+confetti_rot_max:
+  default: 160
+  type: integer
+  min: 0
+  max: 720
+  description: "Max rotation (deg)"
+
+confetti_jitter_x:
+  default: 10
+  type: integer
+  min: 0
+  max: 80
+  description: "Spawn jitter X (px)"
+
+confetti_jitter_y:
+  default: 10
+  type: integer
+  min: 0
+  max: 80
+  description: "Spawn jitter Y (px)"
+
+confetti_w_min:
+  default: 5
+  type: integer
+  min: 1
+  max: 50
+  description: "Particle width min (px)"
+
+confetti_w_max:
+  default: 10
+  type: integer
+  min: 1
+  max: 80
+  description: "Particle width max (px)"
+
+confetti_h_min:
+  default: 6
+  type: integer
+  min: 1
+  max: 60
+  description: "Particle height min (px)"
+
+confetti_h_max:
+  default: 14
+  type: integer
+  min: 1
+  max: 100
+  description: "Particle height max (px)"
+
+confetti_round_chance:
+  default: 0.25
+  type: float
+  min: 0
+  max: 1
+  description: "Chance of a rounded confetti piece (0..1)"
+
+confetti_avoid_avatar:
+  default: true
+  type: bool
+  description: "Try to avoid spawning confetti above the avatar area"
+
+confetti_avoid_avatar_padding:
+  default: 14
+  type: integer
+  min: 0
+  max: 80
+  description: "Extra padding around avatar no-fly zone (px)"
+
+confetti_avoid_avatar_tries:
+  default: 10
+  type: integer
+  min: 1
+  max: 50
+  description: "How many attempts to pick a spawn X outside the avatar zone"
