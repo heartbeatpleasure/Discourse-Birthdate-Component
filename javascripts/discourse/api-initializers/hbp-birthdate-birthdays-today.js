@@ -138,7 +138,6 @@ function ensureUserCardProxy() {
 
   const a = document.createElement("a");
   a.id = "hbp-birthdays-usercard-proxy";
-  a.setAttribute("aria-hidden", "true");
   a.tabIndex = -1;
   a.style.position = "fixed";
   a.style.left = "-9999px";
@@ -159,7 +158,7 @@ function ensureUserCardProxy() {
   return a;
 }
 
-function proxyClickUserCard(username, href, sourceEl) {
+function proxyClickUserCard(username, href, sourceEl, focusReturnEl) {
   const a = ensureUserCardProxy();
 
   a.setAttribute("data-user-card", username);
@@ -181,15 +180,35 @@ function proxyClickUserCard(username, href, sourceEl) {
     a.dispatchEvent(
       new MouseEvent("click", { bubbles: true, cancelable: true, view: window })
     );
+
+    // Keep focus on the real, visible trigger instead of the invisible proxy.
+    window.requestAnimationFrame(() => {
+      try {
+        if (document.activeElement === a) {
+          a.blur();
+        }
+      } catch (_) {}
+
+      try {
+        if (
+          focusReturnEl &&
+          document.contains(focusReturnEl) &&
+          typeof focusReturnEl.focus === "function"
+        ) {
+          focusReturnEl.focus({ preventScroll: true });
+        }
+      } catch (_) {}
+    });
+
     return true;
   } catch (_) {
     return false;
   }
 }
 
-function openUserCard(username, href, sourceEl, originalEvent) {
+function openUserCard(username, href, sourceEl, originalEvent, focusReturnEl) {
   const ok1 = tryTriggerUserCard(username, sourceEl, originalEvent);
-  const ok2 = proxyClickUserCard(username, href, sourceEl);
+  const ok2 = proxyClickUserCard(username, href, sourceEl, focusReturnEl || sourceEl);
   return ok1 || ok2;
 }
 
@@ -428,7 +447,7 @@ function installUserCardClickHandler() {
       const mutatedBefore = _userCardMutatedAt;
 
       const sourceEl = link.querySelector?.("img") || link;
-      openUserCard(username, href, sourceEl, e);
+      openUserCard(username, href, sourceEl, e, link);
 
       window.setTimeout(() => {
         if (isUserCardVisible()) return;
