@@ -51,11 +51,10 @@ function isTruthy(v) {
 
 function getSite(api) {
   try {
-    return (
-      api?.container?.lookup?.("site:main") ||
-      api?.container?.lookup?.("service:site") ||
-      null
-    );
+    // Avoid legacy resolver aliases like `site:main`.
+    // They trigger the `discourse.resolver-resolutions` admin notice on
+    // current Discourse builds. `service:site` is the modern lookup.
+    return api?.container?.lookup?.("service:site") || null;
   } catch (_) {
     return null;
   }

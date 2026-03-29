@@ -106,10 +106,9 @@ let _appEvents = null;
 
 function setAppEventsFromApi(api) {
   try {
-    _appEvents =
-      api?.container?.lookup?.("service:app-events") ||
-      api?.container?.lookup?.("app-events:main") ||
-      null;
+    // Avoid the legacy `app-events:main` alias.
+    // `service:app-events` is the supported lookup.
+    _appEvents = api?.container?.lookup?.("service:app-events") || null;
   } catch (_) {
     _appEvents = null;
   }
