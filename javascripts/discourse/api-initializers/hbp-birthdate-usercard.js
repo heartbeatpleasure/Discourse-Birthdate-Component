@@ -1,6 +1,6 @@
 import { apiInitializer } from "discourse/lib/api";
+import { ajax } from "discourse/lib/ajax";
 import I18n from "I18n";
-import { computed } from "@ember/object";
 
 // User field label to check (admin-configurable via theme settings.yml)
 // When this checkbox is enabled, we hide the user's age on user cards (and we
@@ -63,7 +63,6 @@ function getSite(api) {
 
 function getSiteUserFields(api) {
   const site = getSite(api);
-  // site.user_fields is typically an array of UserField models
   return site?.user_fields || site?.get?.("user_fields") || [];
 }
 
@@ -96,12 +95,10 @@ function getUserFieldValue(user, fieldId) {
   const uf = user.user_fields;
   if (!uf) return null;
 
-  // Some serializers send an object map {"<id>": "value"}
   if (!Array.isArray(uf) && typeof uf === "object") {
     return uf[String(fieldId)] ?? uf[fieldId] ?? null;
   }
 
-  // Some serializers send an array of objects [{id, value}, ...]
   if (Array.isArray(uf)) {
     const item = uf.find((x) => {
       const id = x?.id ?? x?.field_id ?? x?.user_field_id;
@@ -120,153 +117,247 @@ function shouldHideAge(api, user) {
   return isTruthy(getUserFieldValue(user, fieldId));
 }
 
-function removeFieldByLabel(fields, labelToRemove) {
+function getFieldRows(root) {
+  if (!root) return [];
+  return Array.from(root.querySelectorAll(".public-user-field"));
+}
+
+function getFieldLabelEl(row) {
+  if (!row) return null;
+
+  return (
+    row.querySelector(".user-field-name") ||
+    row.querySelector(":scope > span:first-child") ||
+    row.querySelector("dt") ||
+    null
+  );
+}
+
+function getFieldValueEl(row) {
+  if (!row) return null;
+
+  return (
+    row.querySelector(".user-field-value") ||
+    row.querySelector(":scope > span:last-child") ||
+    row.querySelector("dd") ||
+    null
+  );
+}
+
+function removeFieldRowsByLabel(root, labelToRemove) {
   const target = normalizeLabel(labelToRemove);
-  if (!target) return fields;
-  return (fields || []).filter((f) => {
-    const name = f?.field?.name ?? f?.name ?? f?.field_name ?? f?.label ?? "";
-    return normalizeLabel(name) !== target;
+  if (!root || !target) return;
+
+  getFieldRows(root).forEach((row) => {
+    const labelEl = getFieldLabelEl(row);
+    if (!labelEl) return;
+    if (normalizeLabel(labelEl.textContent) === target) {
+      row.remove();
+    }
   });
 }
 
-export default apiInitializer("0.11.1", (api) => {
-  const pluginId = "hbp-birthdate-usercard";
+function findCardPublicFieldsContainer(card) {
+  if (!card) return null;
 
-  // 1) Voeg Age toe als public user field (zoals jouw werkende versie)
-  //    - maar: respecteer het user field "Hide my age on my profile"
-  //      (theme setting: hide_age_user_field_name)
-  try {
-    api.modifyClass("component:user-card-contents", {
-      pluginId,
+  return (
+    card.querySelector(".public-user-fields") ||
+    card.querySelector(".user-card-public-fields") ||
+    null
+  );
+}
 
-      publicUserFields: computed(
-        "user.user_fields",
-        "user.user_fields.@each.value",
-        "user.hbp_birthdate_age",
-        function () {
-          const original = this._super(...arguments) || [];
-          let fields = Array.isArray(original) ? original.slice() : [];
+function ensureCardPublicFieldsContainer(card) {
+  let container = findCardPublicFieldsContainer(card);
+  if (container) return container;
 
-          const age = toInt(this.user?.hbp_birthdate_age);
-          const ageLabel = (t("hbp_birthdate.age", "Age") || "Age").trim();
+  const content =
+    card.querySelector(".card-content") ||
+    card.querySelector(".user-card-contents") ||
+    card;
 
-          // Verwijder de "hide age" user field uit de openbare rendering
-          // (mocht die ooit op 'Show on user card/profile' worden gezet).
-          fields = removeFieldByLabel(fields, getHideAgeFieldName());
+  if (!content) return null;
 
-          // Als user heeft aangevinkt om leeftijd te verbergen: nooit tonen.
-          if (shouldHideAge(api, this.user)) {
-            // Ook defensief: verwijder Age als het op een andere manier in de lijst zit.
-            fields = removeFieldByLabel(fields, ageLabel);
-            return fields;
-          }
+  container = document.createElement("div");
+  container.className = "public-user-fields";
 
-          if (!age || age < 0) return fields;
+  const beforeEl =
+    content.querySelector(".user-card-badges") ||
+    content.querySelector(".badges") ||
+    null;
 
-          // voorkom dubbele Age-regel
-          const filtered = removeFieldByLabel(fields, ageLabel);
-
-          filtered.unshift({
-            field: { name: ageLabel },
-            value: String(age),
-          });
-
-          return filtered;
-        }
-      ),
-    }, { ignoreMissing: true });
-  } catch (e) {
-    // eslint-disable-next-line no-console
-    console.warn(
-      `[${pluginId}] Could not modify component:user-card-contents`,
-      e
-    );
+  if (beforeEl?.parentNode) {
+    beforeEl.parentNode.insertBefore(container, beforeEl);
+  } else {
+    content.appendChild(container);
   }
 
-  // 2) Zorg dat Age exact dezelfde classes krijgt als de andere velden:
-  //    - label span => .user-field-name (bold via core/theme CSS)
-  //    - value span => .user-field-value
-  const applyAgeClasses = () => {
-    const ageLabel = normalizeLabel(t("hbp_birthdate.age", "Age"));
+  return container;
+}
 
-    document.querySelectorAll(".user-card").forEach((card) => {
-      card.querySelectorAll(".public-user-field").forEach((row) => {
-        // Pak label element (Discourse varianten: .user-field-name of eerste span)
-        const labelEl =
-          row.querySelector(".user-field-name") ||
-          row.querySelector(":scope > span:first-child");
+function buildAgeRow(ageLabel, age) {
+  const row = document.createElement("div");
+  row.className = "public-user-field hbp-userfield-age";
+  row.setAttribute("data-hbp-field", "age");
 
-        if (!labelEl) return;
+  const label = document.createElement("span");
+  label.className = "user-field-name";
+  label.textContent = `${ageLabel}:`;
 
-        const labelTxt = normalizeLabel(labelEl.textContent);
-        if (labelTxt !== ageLabel) return;
+  const value = document.createElement("span");
+  value.className = "user-field-value";
+  value.textContent = String(age);
 
-        // Markeer row (handig voor toekomst; geen styling nodig)
-        row.classList.add("hbp-userfield-age");
-        row.setAttribute("data-hbp-field", "age");
+  row.appendChild(label);
+  row.appendChild(value);
+  return row;
+}
 
-        // Forceer dezelfde classes als de rest
-        labelEl.classList.add("user-field-name");
+function parseMetaUser(metaEl) {
+  if (!metaEl) return null;
 
-        const valueEl =
-          row.querySelector(".user-field-value") ||
-          row.querySelector(":scope > span:last-child");
-
-        if (valueEl) valueEl.classList.add("user-field-value");
-      });
-    });
-  };
-
-  // 3) (Voorbereiding) Verberg Age ook op de user profile page als die daar via
-  //    public user fields getoond wordt.
-  //    Dit voegt GEEN age toe aan het profiel; het filtert alleen.
-  const patchProfileComponent = (componentName) => {
-    try {
-      api.modifyClass(componentName, {
-        pluginId,
-
-        publicUserFields: computed(
-          "user.user_fields",
-          "user.user_fields.@each.value",
-          "model.user_fields",
-          "model.user_fields.@each.value",
-          "user.hbp_birthdate_age",
-          "model.hbp_birthdate_age",
-          function () {
-            const original = this._super(...arguments) || [];
-            let fields = Array.isArray(original) ? original.slice() : [];
-
-            const ageLabel = (t("hbp_birthdate.age", "Age") || "Age").trim();
-            const user = this.user || this.model || this.userModel || null;
-
-            // Altijd hide-field zelf weghalen uit openbare rendering
-            fields = removeFieldByLabel(fields, getHideAgeFieldName());
-
-            // Age conditioneel weghalen
-            if (shouldHideAge(api, user)) {
-              fields = removeFieldByLabel(fields, ageLabel);
-            }
-
-            return fields;
-          }
-        ),
-      }, { ignoreMissing: true });
-    } catch (_) {
-      // no-op (component bestaat niet in deze Discourse versie / layout)
+  let userFields = {};
+  try {
+    const raw = metaEl.dataset?.hbpUserFields;
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === "object") {
+        userFields = parsed;
+      }
     }
+  } catch (_) {}
+
+  return {
+    user_fields: userFields,
+    hbp_birthdate_age: metaEl.dataset?.hbpAge,
   };
+}
 
-  // We proberen een paar mogelijke componenten (afhankelijk van Discourse versie/theme).
-  patchProfileComponent("component:user-profile-primary");
-  patchProfileComponent("component:user-profile-secondary");
-  patchProfileComponent("component:user-profile");
+function applyAgeClasses(root) {
+  const ageLabel = normalizeLabel(t("hbp_birthdate.age", "Age"));
 
+  getFieldRows(root).forEach((row) => {
+    const labelEl = getFieldLabelEl(row);
+    if (!labelEl) return;
+
+    if (normalizeLabel(labelEl.textContent) !== ageLabel) return;
+
+    row.classList.add("hbp-userfield-age");
+    row.setAttribute("data-hbp-field", "age");
+    labelEl.classList.add("user-field-name");
+
+    const valueEl = getFieldValueEl(row);
+    if (valueEl) valueEl.classList.add("user-field-value");
+  });
+}
+
+function applyCardAgeFiltering(api, card) {
+  if (!card) return;
+
+  const ageLabel = (t("hbp_birthdate.age", "Age") || "Age").trim();
+  const metaEl = card.querySelector(".hbp-birthday-meta");
+  if (!metaEl) {
+    removeFieldRowsByLabel(card, getHideAgeFieldName());
+    applyAgeClasses(card);
+    return;
+  }
+
+  const user = parseMetaUser(metaEl);
+  const age = toInt(user?.hbp_birthdate_age);
+  const hideAge = shouldHideAge(api, user);
+
+  removeFieldRowsByLabel(card, getHideAgeFieldName());
+  removeFieldRowsByLabel(card, ageLabel);
+
+  if (!hideAge && age !== null && age >= 0) {
+    const container = ensureCardPublicFieldsContainer(card);
+    if (container) {
+      container.prepend(buildAgeRow(ageLabel, age));
+    }
+  }
+
+  applyAgeClasses(card);
+}
+
+function getProfileRoot() {
+  return (
+    document.querySelector(".user-main") ||
+    document.querySelector(".user-content") ||
+    document.querySelector(".user-profile") ||
+    null
+  );
+}
+
+function getProfileUsername() {
+  const path = window.location?.pathname || "";
+  const m = path.match(/^\/u\/([^/]+)/i);
+  if (!m) return null;
+
+  try {
+    return decodeURIComponent(m[1]);
+  } catch (_) {
+    return m[1];
+  }
+}
+
+const userCache = new Map();
+
+async function fetchUserForProfile(username) {
+  const key = String(username || "").trim().toLowerCase();
+  if (!key) return null;
+
+  if (userCache.has(key)) {
+    return userCache.get(key);
+  }
+
+  const promise = ajax(`/u/${encodeURIComponent(key)}.json`)
+    .then((result) => result?.user || result || null)
+    .catch(() => null);
+
+  userCache.set(key, promise);
+  return promise;
+}
+
+async function applyProfileAgeFiltering(api) {
+  const root = getProfileRoot();
+  if (!root) return;
+
+  const ageLabel = (t("hbp_birthdate.age", "Age") || "Age").trim();
+  removeFieldRowsByLabel(root, getHideAgeFieldName());
+
+  const username = getProfileUsername();
+  if (!username) {
+    applyAgeClasses(root);
+    return;
+  }
+
+  const user = await fetchUserForProfile(username);
+  if (shouldHideAge(api, user)) {
+    removeFieldRowsByLabel(root, ageLabel);
+  }
+
+  removeFieldRowsByLabel(root, getHideAgeFieldName());
+  applyAgeClasses(root);
+}
+
+export default apiInitializer("0.11.1", (api) => {
   let timer = null;
+  let profileRun = 0;
+
   const schedule = () => {
     if (timer) return;
+
     timer = setTimeout(() => {
       timer = null;
-      applyAgeClasses();
+
+      document.querySelectorAll(".user-card").forEach((card) => {
+        applyCardAgeFiltering(api, card);
+      });
+
+      const runId = ++profileRun;
+      applyProfileAgeFiltering(api).finally(() => {
+        if (runId !== profileRun) return;
+      });
     }, 50);
   };
 
