@@ -67,6 +67,35 @@ function getSiteUserFields(api) {
   return site?.user_fields || site?.get?.("user_fields") || [];
 }
 
+function hasFactory(api, fullName) {
+  try {
+    if (typeof api?.container?.factoryFor === "function") {
+      return !!api.container.factoryFor(fullName);
+    }
+  } catch (_) {}
+
+  try {
+    if (typeof api?.container?.lookupFactory === "function") {
+      return !!api.container.lookupFactory(fullName);
+    }
+  } catch (_) {}
+
+  try {
+    if (typeof api?.container?.registry?.has === "function") {
+      return api.container.registry.has(fullName);
+    }
+  } catch (_) {}
+
+  try {
+    const registrations = api?.container?._registry?.registrations;
+    if (registrations && Object.prototype.hasOwnProperty.call(registrations, fullName)) {
+      return true;
+    }
+  } catch (_) {}
+
+  return false;
+}
+
 function normalizeLabel(s) {
   return String(s || "")
     .trim()
@@ -136,6 +165,8 @@ export default apiInitializer("0.11.1", (api) => {
   //    - maar: respecteer het user field "Hide my age on my profile"
   //      (theme setting: hide_age_user_field_name)
   try {
+    if (!hasFactory(api, "component:user-card-contents")) return;
+
     api.modifyClass("component:user-card-contents", {
       pluginId,
 
@@ -221,6 +252,8 @@ export default apiInitializer("0.11.1", (api) => {
   //    public user fields getoond wordt.
   //    Dit voegt GEEN age toe aan het profiel; het filtert alleen.
   const patchProfileComponent = (componentName) => {
+    if (!hasFactory(api, componentName)) return;
+
     try {
       api.modifyClass(componentName, {
         pluginId,
