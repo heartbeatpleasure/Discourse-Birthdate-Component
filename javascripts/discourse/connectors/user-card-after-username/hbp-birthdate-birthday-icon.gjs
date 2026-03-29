@@ -16,7 +16,9 @@ function t(key, fallback = "") {
   for (const k of candidates) {
     try {
       const v = I18n.t(k);
-      if (v && !String(v).startsWith("[")) return v;
+      if (v && !String(v).startsWith("[")) {
+        return v;
+      }
     } catch (_) {}
   }
 
@@ -53,21 +55,21 @@ export default class HbpBirthdateBirthdayIconConnector extends Component {
   get isBirthdayToday() {
     return Boolean(this.user?.hbp_birthdate_birthday_today);
   }
+
+  <template>
+    {{#if this.user}}
+      <span
+        class="hbp-birthday-meta"
+        hidden
+        data-hbp-age={{this.age}}
+        data-hbp-user-fields={{this.userFieldsJson}}
+      ></span>
+    {{/if}}
+
+    {{#if this.isBirthdayToday}}
+      <span class="hbp-birthday-icon" title={{this.birthdayTitle}}>
+        🎂
+      </span>
+    {{/if}}
+  </template>
 }
-
-<template>
-  {{#if this.user}}
-    <span
-      class="hbp-birthday-meta"
-      hidden
-      data-hbp-age={{this.age}}
-      data-hbp-user-fields={{this.userFieldsJson}}
-    ></span>
-  {{/if}}
-
-  {{#if this.isBirthdayToday}}
-    <span class="hbp-birthday-icon" title={{this.birthdayTitle}}>
-      🎂
-    </span>
-  {{/if}}
-</template>
