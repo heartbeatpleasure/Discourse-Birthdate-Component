@@ -225,7 +225,205 @@
 }
 
 .hbp-birthdays-online__more {
+  appearance: none;
+  border: 0;
+  background: transparent;
   padding: 0 0.2rem;
+  margin: 0;
+  cursor: pointer;
+  border-radius: 999px;
+  line-height: inherit;
+  text-align: center;
+}
+
+.hbp-birthdays-online__more:hover,
+.hbp-birthdays-online__more:focus-visible {
+  color: var(--tertiary);
+  background: var(--tertiary-low, var(--primary-low));
+  outline: none;
+}
+
+/* ===== Today's birthdays overflow overlay ===== */
+
+.hbp-birthdays-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10050;
+  pointer-events: none;
+}
+
+.hbp-birthdays-overlay__scrim {
+  appearance: none;
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  background: transparent;
+  cursor: default;
+  pointer-events: auto;
+}
+
+.hbp-birthdays-overlay__panel {
+  position: fixed;
+  max-height: min(420px, calc(100vh - 24px));
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  color: var(--primary);
+  background: var(--secondary);
+  border: 1px solid var(--primary-low);
+  border-radius: 12px;
+  box-shadow: 0 14px 38px rgba(0, 0, 0, 0.22);
+  pointer-events: auto;
+}
+
+.hbp-birthdays-overlay__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.75rem 0.85rem;
+  border-bottom: 1px solid var(--primary-low);
+}
+
+.hbp-birthdays-overlay__title {
+  margin: 0;
+  min-width: 0;
+  font-size: var(--font-up-1);
+  font-weight: 600;
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hbp-birthdays-overlay__close {
+  appearance: none;
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border: 0;
+  border-radius: 999px;
+  padding: 0;
+  margin: 0;
+  color: var(--primary-medium);
+  background: transparent;
+  font-size: 1.6rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.hbp-birthdays-overlay__close:hover,
+.hbp-birthdays-overlay__close:focus-visible {
+  color: var(--primary);
+  background: var(--primary-low);
+  outline: none;
+}
+
+.hbp-birthdays-overlay__body {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 0.35rem;
+}
+
+.hbp-birthdays-overlay__list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.hbp-birthdays-overlay__user {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  min-width: 0;
+  padding: 0.5rem;
+  border-radius: 10px;
+  color: var(--primary);
+  text-decoration: none;
+}
+
+.hbp-birthdays-overlay__user:hover,
+.hbp-birthdays-overlay__user:focus-visible {
+  color: var(--primary);
+  background: var(--primary-very-low);
+  outline: none;
+}
+
+.hbp-birthdays-overlay__avatar {
+  flex: 0 0 auto;
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  display: block;
+}
+
+.hbp-birthdays-overlay__user-text {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.05rem;
+}
+
+.hbp-birthdays-overlay__name,
+.hbp-birthdays-overlay__username {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hbp-birthdays-overlay__name {
+  font-weight: 600;
+}
+
+.hbp-birthdays-overlay__username {
+  color: var(--primary-medium);
+  font-size: var(--font-down-1);
+}
+
+@media screen and (max-width: 767px) {
+  .hbp-birthdays-overlay__scrim {
+    background: rgba(0, 0, 0, 0.35);
+  }
+
+  .hbp-birthdays-overlay__panel {
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100%;
+    max-height: min(72vh, calc(100vh - 32px));
+    border-right: 0;
+    border-bottom: 0;
+    border-left: 0;
+    border-radius: 16px 16px 0 0;
+    box-shadow: 0 -12px 34px rgba(0, 0, 0, 0.28);
+  }
+
+  .hbp-birthdays-overlay__header {
+    padding: 0.8rem 1rem;
+  }
+
+  .hbp-birthdays-overlay__body {
+    padding: 0.45rem 0.65rem max(0.9rem, env(safe-area-inset-bottom));
+  }
+
+  .hbp-birthdays-overlay__user {
+    min-height: 44px;
+    padding: 0.6rem;
+  }
+
+  .hbp-birthdays-overlay__avatar {
+    width: 36px;
+    height: 36px;
+  }
 }
 
 /* Sidebar variant (if used later) */
